@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Logging Settings</title>
+    <style>
+        body { font-family: 'Segoe UI', 'Segoe WP', 'Helvetica Neue', 'RobotoRegular', sans-serif; font-size: 14px; }
+        header h1 { font-family: 'Segoe UI Light', 'Helvetica Neue', 'RobotoLight', 'Segoe UI', 'Segoe WP', sans-serif; font-size: 28px; font-weight: 100; margin-top: 5px; margin-bottom: 0px; }
+            header h1 a { padding: 10px; }
+        #index { border-collapse: separate; border-spacing: 0; margin: 0 0 20px; }
+            #index th { vertical-align: bottom; padding: 10px 5px 5px 5px; font-weight: 400; color: #a0a0a0; text-align: center; }
+            #index td { padding: 3px 10px; }
+            #index th, #index td { border-right: 1px #ddd solid; border-bottom: 1px #ddd solid; border-left: 1px transparent solid; border-top: 1px transparent solid; box-sizing: border-box; }
+                #index th:last-child, #index td:last-child { border-right: 1px transparent solid; }
+                #index td.length, td.modified { text-align: right; }
+        a { color: #1ba1e2; text-decoration: none; }
+            a:hover { color: #13709e; text-decoration: underline; }
+  </style>
+    <script>
+        function setDefaultLevel(ele) {
+            var selects =  document.getElementsByName('_level');
+            for (var i = 0; i < selects.length; i++) {
+                var s = selects[i];
+                s.value = ele.value;
+            }
+        }
+        function setDefaultType(ele)
+        {
+            var selects =  document.getElementsByName('_type');
+            for (var i = 0; i < selects.length; i++) {
+                var s = selects[i];
+                s.value = ele.value;
+            }
+        }
+        function _save() {
+            var xmlHttp = null;
+            if (window.XMLHttpRequest) {
+                xmlHttp = new XMLHttpRequest();
+            }
+            else if (window.ActiveXObject) {
+                xmlHttp = new ActiveXObject('Microsoft.XMLHTTP');
+            }
+            if (xmlHttp != null) {
+                xmlHttp.onreadystatechange = function () {
+                    if (xmlHttp.readyState == 4 && xmlHttp.status == 200) { setTimeout(function () { location.reload(); }, 300); }
+                }
+                var tbody=document.getElementsByTagName('tbody')[0];                
+                var trs=tbody.getElementsByTagName("tr");                
+                var Rules = [];
+                for (var i = 0; i < trs.length; i++) {
+                    var tds = trs[i].getElementsByTagName("td");
+                    var sels = trs[i].getElementsByTagName('select');
+                    Rules.push({ CategoryName: tds[0].innerText, LogLevel: sels[0].value, LogType: sels[1].value});
+                }               
+                xmlHttp.open('POST', '{{url}}');
+                xmlHttp.setRequestHeader('Content-Type', 'application/json');
+                //console.log(JSON.stringify({ Rules: Rules }));
+                xmlHttp.send(JSON.stringify({ Rules: Rules }));
+            }
+            else {
+                alert('Your browser does not support XMLHTTP.');
+            }
+        };
+    </script>
+</head>
+<body>
+    {{body}}
+</body>
+</html>

@@ -162,4 +162,36 @@ namespace System
         }
 
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public static class ExceptionExtionsions
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="exception"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public static Exception Log(this Exception exception, string message = null)
+        {
+            Logger.Error(exception.GetType().FullName, message, exception);
+            return exception;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="exception"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public static Exception Log<T>(this Exception exception, string message = null)
+            where T : class
+        {
+            var type = exception.GetType();
+            Logger.Error<T>(message, exception);
+            return exception;
+        }
+    }
 }

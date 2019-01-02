@@ -5,6 +5,7 @@ https://www.nuget.org/packages/AspNetCore.FileLog/
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddFileLog(".Logs");
+        //services.AddFileLog("C:/wwwroot/.Logs");
     }
     public void Configure(IApplicationBuilder app)
     {

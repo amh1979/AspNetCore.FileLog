@@ -27,11 +27,7 @@ namespace AspNetCore.FileLog
         { }
         public HtmlDirectoryFormatter(HtmlEncoder encoder)
         {
-            if (encoder == null)
-            {
-                throw new ArgumentNullException("encoder");
-            }
-            _htmlEncoder = encoder;
+            _htmlEncoder = encoder?? throw new ArgumentNullException("encoder");
             CurrentCulture= System.Globalization.CultureInfo.CurrentCulture;
         }
 

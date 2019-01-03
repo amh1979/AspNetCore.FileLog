@@ -22,8 +22,7 @@ namespace AspNetCore.FileLog
 {
     internal class LoggerFactory : ILoggerFactory
     {
-        private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();
-        internal static readonly ConcurrentBag<LoggerContent> Contents = new ConcurrentBag<LoggerContent>();
+        private static readonly LoggerRuleSelector RuleSelector = new LoggerRuleSelector();       
         internal static readonly Dictionary<string, Logger> _loggers = new Dictionary<string, Logger>(StringComparer.Ordinal);
         private readonly List<ProviderRegistration> _providerRegistrations = new List<ProviderRegistration>();
         private static readonly object _sync = new object();
@@ -32,6 +31,7 @@ namespace AspNetCore.FileLog
         internal static LoggerFilterOptions _filterOptions;
         IHostingEnvironment _environment;
         IHttpContextAccessor _httpContextAccessor;
+        ILogAdapter _logAdapter;
         internal LoggerExternalScopeProvider ScopeProvider { get; private set; }
         static internal IServiceCollection ServiceCollection { get; set; }
         static internal IServiceProvider ServiceProvider { get; set; }
@@ -39,6 +39,7 @@ namespace AspNetCore.FileLog
             IEnumerable<ILoggerProvider> providers,
             IHttpContextAccessor httpContextAccessor,
             IServiceProvider serviceProvider,
+            ILogAdapter logAdapter,
             IOptionsMonitor<MSLOG.LoggerFilterOptions> filterOption)
         {
             ServiceProvider = serviceProvider;
@@ -51,16 +52,7 @@ namespace AspNetCore.FileLog
             if (!Directory.Exists(LoggerSettings.LogDirectory))
             {
                 Directory.CreateDirectory(LoggerSettings.LogDirectory);
-            }
-            RunTask();
-            AppDomain.CurrentDomain.ProcessExit += (object sender, EventArgs e) =>
-            {
-                WriteToFile(Contents.ToList());
-            };
-            AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
-            {
-                Logger.Error<AppDomain>($"{sender}; {Newtonsoft.Json.JsonConvert.SerializeObject(e.ExceptionObject)}");
-            };
+            } 
             foreach (var provider in providers)
             {
                 AddProviderRegistration(provider, dispose: false);
@@ -69,77 +61,11 @@ namespace AspNetCore.FileLog
             //    $"Create ILoggerFactory{Environment.NewLine}");
             RefreshFilters(filterOption.CurrentValue, string.Empty);
             _changeTokenRegistration = filterOption.OnChange(RefreshFilters);
+            _logAdapter = logAdapter;
+            _logAdapter.FileDirectory = LoggerSettings.LogDirectory;
         }
 
-        #region write log
-        static bool isRunning = false;
-        private void RunTask()
-        {
-            lock (_sync)
-            {
-                if (!isRunning)
-                {
-                    isRunning = true;
-                    Task.Run(() =>
-                    {
-                        while (true)
-                        {
-                            System.Threading.Thread.Sleep(1000 * 2);
-                            if (!Contents.IsEmpty)
-                            {
-                                var list = new List<LoggerContent>();
-                                while (!Contents.IsEmpty)
-                                {
-                                    if (Contents.TryTake(out LoggerContent content))
-                                    {
-                                        list.Add(content);
-                                    }
-                                    else
-                                    {
-                                        throw new Exception("ConcurrentBag.TryTake error");
-                                    }
-                                }
-                                WriteToFile(list);
-                                list = null;
-                            }
-                        }
-                    });
-                }
-            }
-        }
-        private void WriteToFile(List<LoggerContent> contents)
-        {
-            if (contents.Count > 0)
-            {
-                var list = contents.GroupBy(t => t.Path).Select(t => new
-                {
-                    Path = t.Key,
-                    List = t.ToList()
-                }).ToList();
-
-                foreach (var a in list)
-                {
-                    var file = new FileInfo(a.Path);
-                    if (!file.Directory.Exists)
-                    {
-                        file.Directory.Create();
-                    }
-                    using (var write = file.AppendText())
-                    {
-                        foreach (var f in a.List.OrderBy(t => t.Ticks))
-                        {
-                            using (f)
-                            {
-                                write.Write($"{f.Message}{Environment.NewLine}");
-                            }
-                        }
-                        write.Flush();
-                    }
-                }
-            }
-        }
-
-        #endregion
+   
         private void RefreshFilters(MSLOG.LoggerFilterOptions filterOptions, string value)
         {
             lock (_sync)
@@ -166,7 +92,7 @@ namespace AspNetCore.FileLog
             {
                 if (!_loggers.TryGetValue(categoryName, out var logger))
                 {
-                    logger = new Logger(this, _httpContextAccessor)
+                    logger = new Logger(this, _httpContextAccessor, _logAdapter)
                     {
                         Loggers = CreateLoggers(categoryName)
                     };
@@ -227,7 +153,7 @@ namespace AspNetCore.FileLog
             loggerInformation.Logger = provider.CreateLogger(categoryName);
             loggerInformation.ProviderType = provider.GetType();
             loggerInformation.ExternalScope = provider is ISupportExternalScope;
-            loggerInformation.LogType = LogType.HttpContext;
+            loggerInformation.LogType = LogType.None;
         }
 
         private LoggerInformation[] CreateLoggers(string categoryName)

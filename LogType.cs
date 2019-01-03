@@ -11,11 +11,26 @@ using System.Text;
 
 namespace AspNetCore.FileLog
 {
-    internal enum LogType
+    /// <summary>
+    /// 
+    /// </summary>
+    public enum LogType
     {
+        /// <summary>
+        /// None
+        /// </summary>
         None = 0,
+        /// <summary>
+        /// Contains http request information
+        /// </summary>
         HttpContext = 1,
+        /// <summary>
+        /// Contains stack trace information
+        /// </summary>
         TraceStack = 2,
+        /// <summary>
+        /// Contains all information
+        /// </summary>
         All = 3,
     }
 }

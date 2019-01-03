@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -55,6 +56,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     logDirectory = ".Logs";
                 }
                 services.AddHttpContextAccessor();
+                services.AddSingleton<ILogAdapter, FileLogAdapter>();
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
                 Console.OutputEncoding = System.Text.Encoding.UTF8;
                 var _config = services.FirstOrDefault(x => x.ServiceType == typeof(IConfiguration))?.ImplementationInstance as IConfiguration;
@@ -141,6 +143,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     x.Services.AddSingleton<IConfigureOptions<Logging.LoggerFilterOptions>>(new LOG.LoggerFilterConfigureOptions(configuration));
                 });
                 services.Replace(ServiceDescriptor.Singleton<ILoggerFactory, LOG.LoggerFactory>());
+                services.Replace(ServiceDescriptor.Singleton<DiagnosticSource>(new DefaultDiagnosticListener()));
             }
         }
 
@@ -155,7 +158,7 @@ namespace Microsoft.Extensions.DependencyInjection
             LOG.LoggerFactory.ServiceProvider = app.ApplicationServices;
             if (app.ApplicationServices.GetService<ILoggerFactory>().GetType() != typeof(LOG.LoggerFactory))
             {
-                throw new NotImplementedException($"Please use IServiceCollection.AddFileLogging first.");
+                throw new NotImplementedException($"Please use IServiceCollection.AddFileLog first.");
             }
             LoggerSettings.LogRequestPath = browsePath;
             LoggerSettings.SettingsPath = settingsPath;

@@ -19,25 +19,7 @@ namespace System
     /// </summary>
     public partial class Logger
     {
-        static Type[] IgnoreTypes = new Type[] {
-            typeof(Logger),
-            typeof(Microsoft.Extensions.Logging.LoggerExtensions)
-        };
-        static readonly Regex NewLineRegex = new Regex("([\\n\\r]+)");
-        static readonly string[] MessageTitle = new string[]
-        {
-            "Message:    ",
-            "Path:       ",
-            "Method:     ",
-            "From IP:    ",
-            "UserAgent:  ",
-            "User:       ",
-            "Query:      ",
-            "Form:       ",
-            "Body:       ",
-            "Error:      ",
-            "StackTrace: "
-        };
+        
         private static void WriteLog(string categoryName, EventId eventId, LogLevel level, string message, Exception exception)
         {
             //new StackTrace(true)

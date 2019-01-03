@@ -3,12 +3,14 @@
 * 创 建 者：WeiGe
 * 创建日期：1/2/2019 11:46:25 PM
 * ===============================================*/
-
+ 
+using AspNetCore.FileLog;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Security;
 using System.Text;
@@ -16,8 +18,37 @@ using System.Text.RegularExpressions;
 
 namespace System
 {
-    internal static class SystemExtionsions
-    {
+    internal static class SystemExtensions
+    {/// <summary>
+     /// Use Reflect get value of current <paramref name="value"/> by <paramref name="name"/>
+     /// </summary>
+     /// <param name="value">current value</param>
+     /// <param name="name">field or property
+     /// <para>e.g.: 'a.b.c'</para>
+     /// </param>
+     /// <returns></returns>
+        public static object Value(this object value, string name)
+        {
+            if (value == null || value == DBNull.Value || string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+            var names = name.Split(new char[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
+            object _value = value;
+            foreach (string n in names)
+            {
+                var @delegate = FastExpressions.CreateDelegate(_value);
+                if (@delegate != null)
+                {
+                    _value = @delegate(_value, n, false, null);
+                }
+                if (_value == null)
+                {
+                    break;
+                }
+            }
+            return _value;
+        }
         static Regex FileRegex = new Regex("\\.[^\\.]+$", RegexOptions.IgnoreCase);
         /// <summary>
         /// 
@@ -166,7 +197,7 @@ namespace System
     /// <summary>
     /// 
     /// </summary>
-    public static class ExceptionExtionsions
+    public static class ExceptionExtensions
     {
         /// <summary>
         /// 
@@ -192,6 +223,78 @@ namespace System
             var type = exception.GetType();
             Logger.Error<T>(message, exception);
             return exception;
+        }
+    }
+    /// <summary>
+    /// 
+    /// </summary>
+    public static class HttpContextExtensions
+    {
+        static readonly object _state = new object();
+        internal const string Body = "_BODY";
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public static string ReadBody(this HttpContext context)
+        {
+            if (context.Items[Body] != null)
+            {
+                return context.Items[Body] as string;
+            }
+            lock (_state)
+            {
+               
+                Stream body = context.Request.Body;
+                if (!(body is FileBufferingReadStream stream))
+                {
+                    if (context.Request.HasFormContentType)
+                    {
+                        var form = context.Request.ReadFormAsync().GetAwaiter().GetResult();
+                    }
+                    stream = (FileBufferingReadStream)(context.Request.Body = new FileBufferingReadStream(body, 30720, default(long?), _getTempDirectory));
+                    context.Response.RegisterForDispose(stream);
+                }
+                if (stream.IsDisposed)
+                {
+                    return string.Empty;
+                }
+                if (stream.Position > 0)
+                {
+                    stream.Seek(0, SeekOrigin.Begin);
+                }
+                StreamReader sr = new StreamReader(stream);
+                var content = sr.ReadToEnd();
+                if (content.Length < 1024*1024*2)
+                {
+                    context.Items[Body] = content;
+                }
+                stream.Seek(0, SeekOrigin.Begin);
+                return content;
+            }
+        }
+        private static readonly Func<string> _getTempDirectory = () => TempDirectory;
+
+        private static string _tempDirectory;
+        /// <summary>
+        /// 
+        /// </summary>
+        public static string TempDirectory
+        {
+            get
+            {
+                if (_tempDirectory == null)
+                {
+                    string text = Environment.GetEnvironmentVariable("ASPNETCORE_TEMP") ?? Path.GetTempPath();
+                    if (!Directory.Exists(text))
+                    {
+                        throw new DirectoryNotFoundException(text);
+                    }
+                    _tempDirectory = text;
+                }
+                return _tempDirectory;
+            }
         }
     }
 }

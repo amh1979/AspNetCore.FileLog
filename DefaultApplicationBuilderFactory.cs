@@ -15,7 +15,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
 
-
 namespace Microsoft.AspNetCore.Builder
 {
     internal class DefaultApplicationBuilderFactory : IApplicationBuilderFactory

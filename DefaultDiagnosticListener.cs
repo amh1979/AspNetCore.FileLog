@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 
-
 namespace AspNetCore.FileLog
 {
     internal class DefaultDiagnosticListener : DiagnosticListener

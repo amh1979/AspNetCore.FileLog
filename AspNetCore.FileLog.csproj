@@ -16,6 +16,9 @@
     <PackageTags>Logging,AspNetCore,FileLog,File,Log</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="FileLogAdapter.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="markdown\markdown.html" />
     <None Remove="settingsPage.html" />
     <None Remove="markdown\cerulean.min.css" />
@@ -33,7 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.RazorPages" Version="2.2.0"/>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.RazorPages" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="4.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.StaticFiles" Version="2.2.0" />

@@ -1,29 +1,15 @@
 # AspNetCore.FileLog
+Log information to file for .net core
 https://www.nuget.org/packages/AspNetCore.FileLog/
 
-ÏêÏ¸ÓÃ·¨: https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
+è¯¦ç»†ç”¨æ³•: https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
 
     public void ConfigureServices(IServiceCollection services)
     {
-        services.AddFileLog(logger =>
-        {
-            //default is UseText;
-            logger.UseText();
-
-            logger.UseMarkdown();
-            logger.UseLogAdapter<DatabaseLogAdapter>();
-
-            //default
-            logger.SettingsPath = "/_Settings_";
-
-            //default
-            logger.LogRequestPath = "/_Logs_";
-
-            //default
-            logger.LogDirectory = ".Logs";
-        });
+        services.AddFileLog(".Logs");
+        //services.AddFileLog("C:/wwwroot/.Logs");
     }
     public void Configure(IApplicationBuilder app)
     {
-       // 
+        app.UseFileLog("/_Logs_","/_Settings_");
     }

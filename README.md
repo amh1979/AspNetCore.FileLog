@@ -1,9 +1,11 @@
 # AspNetCore.FileLog
+Log information to file
+support type: markdown,txt,database,system events
 https://www.nuget.org/packages/AspNetCore.FileLog/
 
-详细用法(v.2.2.0.3): https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
+详细用法(v2.2.0.3): https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
 
-//now version 2.2.0.10
+//now version v2.2.0.4
 
     public void ConfigureServices(IServiceCollection services)
     {

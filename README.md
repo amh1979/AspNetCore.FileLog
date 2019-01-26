@@ -31,3 +31,4 @@ https://www.nuget.org/packages/AspNetCore.FileLog/
     {
        // 
     }
+![settings](https://github.com/amh1979/AspNetCore.FileLog/blob/master/settings.png)

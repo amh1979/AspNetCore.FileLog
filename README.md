@@ -1,7 +1,9 @@
 # AspNetCore.FileLog
 https://www.nuget.org/packages/AspNetCore.FileLog/
 
-详细用法: https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
+详细用法(v.2.2.0.3): https://github.com/AspNetCoreFoundations/AspNetCore.FileLog
+
+//now version 2.2.0.10
 
     public void ConfigureServices(IServiceCollection services)
     {

@@ -20,7 +20,7 @@ namespace AspNetCore.FileLog
     /// The content is buffered in memory up to a certain size and then spooled to a temp file on disk.
     /// The temp file will be deleted on Dispose.
     /// </summary>
-    public class FileBufferingReadStream : Stream
+    internal class FileBufferingReadStream : Stream
     {
         private const int _maxRentedBufferSize = 1024 * 1024; // 1MB
         private readonly Stream _inner;

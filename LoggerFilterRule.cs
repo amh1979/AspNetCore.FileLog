@@ -14,14 +14,21 @@ namespace AspNetCore.FileLog
 {
     internal class LoggerFilterRule : Microsoft.Extensions.Logging.LoggerFilterRule
     {
+        public static LoggerFilterRule Default { get; } = CreateDefault();
+        public static LoggerFilterRule CreateDefault()
+        {
+            return new LoggerFilterRule(LoggerSettings.DefaultProviderName, LoggerSettings.DefaultName, Microsoft.Extensions.Logging.LogLevel.Information, null);
+        }
         public LoggerFilterRule(string providerName, string categoryName, LogLevel? logLevel, Func<string, string, LogLevel, bool> filter)
             : base(providerName, categoryName, logLevel, filter)
         {
         }
         public LogType LogType { get; set; }
+        public LogScope LogScope { get; set; }
+        public int TraceCount { get; set; } = LoggerSettings.TraceCount;
         public override string ToString()
         {
-            return $"{nameof(ProviderName)}: '{ProviderName}', {nameof(CategoryName)}: '{CategoryName}', {nameof(LogLevel)}: '{LogLevel}', {nameof(LogType)}: '{LogType}', {nameof(Filter)}: '{Filter}'";
+            return $"{nameof(ProviderName)}: '{ProviderName}', {nameof(CategoryName)}: '{CategoryName}', {nameof(LogLevel)}: '{LogLevel}', {nameof(LogScope)}: '{LogScope}', {nameof(Filter)}: '{Filter}'";
         }
     }
 }

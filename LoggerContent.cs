@@ -22,36 +22,30 @@ namespace AspNetCore.FileLog
         {
             AppDomain.CurrentDomain.ProcessExit += (object sender, EventArgs e) =>
             {
-                WriteToFile(Contents.ToList()).GetAwaiter().GetResult();
+                Task.WaitAll(WriteToFile(Contents.ToList()));
             };
             AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) =>
             {
-                Logger.Error<AppDomain>($"{sender}; {Newtonsoft.Json.JsonConvert.SerializeObject(e.ExceptionObject)}");
+                Logger.Error<AppDomain>($"{sender}; {e.ExceptionObject.ToJson()}");
             };
-            Task.Run(async () =>
+            System.Timers.Timer timer = new System.Timers.Timer(1000 * 0.8);
+            timer.Elapsed += async (sender, e) =>
             {
-                while (true)
+                if (!Contents.IsEmpty)
                 {
-                    System.Threading.Thread.Sleep(1000 * 2);
-                    if (!Contents.IsEmpty)
+                    var list = new List<LoggerContent>();
+                    while (!Contents.IsEmpty)
                     {
-                        var list = new List<LoggerContent>();
-                        while (!Contents.IsEmpty)
+                        if (Contents.TryTake(out LoggerContent content))
                         {
-                            if (Contents.TryTake(out LoggerContent content))
-                            {
-                                list.Add(content);
-                            }
-                            else
-                            {
-                                throw new Exception("ConcurrentBag.TryTake error");
-                            }
+                            list.Add(content);
                         }
-                        await WriteToFile(list);
-                        list = null;
                     }
+                    await WriteToFile(list);
+                    list = null;
                 }
-            });
+            };
+            timer.Start();
         }
         static async Task WriteToFile(List<LoggerContent> contents)
         {
@@ -61,7 +55,7 @@ namespace AspNetCore.FileLog
                 {
                     Path = t.Min(x => x.Path),
                     List = t.ToList()
-                }).ToList();
+                });
 
                 foreach (var content in list)
                 {
@@ -73,16 +67,30 @@ namespace AspNetCore.FileLog
                         {
                             file.Directory.Create();
                         }
-                        using (var write = file.AppendText())
+                        bool retreid = false;
+                    RETRY:
+                        try
                         {
-                            foreach (var f in content.List.OrderBy(t => t.Ticks))
+                            using (var write = file.AppendText())
                             {
-                                using (f)
+                                foreach (var f in content.List.OrderBy(t => t.Ticks))
                                 {
-                                    write.Write(f.Message);
+                                    using (f)
+                                    {
+                                        write.WriteLine(f.Message);
+                                    }
                                 }
+                                write.Flush();
                             }
-                            write.Flush();
+                        }
+                        catch
+                        {
+                            if (!retreid)
+                            {
+                                file = new FileInfo(System.IO.Path.Combine(file.DirectoryName, $"{System.IO.Path.GetFileNameWithoutExtension(file.Name)}_fail{file.Extension}"));
+                                retreid = true;
+                                goto RETRY;
+                            }
                         }
                     });
                 }
@@ -96,7 +104,7 @@ namespace AspNetCore.FileLog
                 return;
             }
             this.Path = path;
-            this.Message = message;
+            this.Message = message.Trim();
             this.PathHash = this.Path.GetHashCode();
             Contents.Add(this);
         }

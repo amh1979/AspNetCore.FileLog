@@ -60,16 +60,10 @@ namespace AspNetCore.FileLog
 
                 }
                 System.IO.File.WriteAllText(file.PhysicalPath, LoggerSettings.LoggingJsonContent);
-                var rule = new LoggerFilterRule(LoggerSettings.DefaultProviderName, LoggerSettings.DefaultName, LogLevel.Information, null);
-                rule.LogType = LogType.All;
-                options.Rules.Add(rule);
             }
-            else
-            {
-                var rule = new LoggerFilterRule(LoggerSettings.DefaultProviderName, LoggerSettings.DefaultName, LogLevel.Information, null);
-                rule.LogType = LogType.All;
-                options.Rules.Add(rule);
-            } 
+            var rule = LoggerFilterRule.Default;
+            rule.LogScope = LogScope.All;            
+            options.Rules.Add(rule);
         }
     }
 }

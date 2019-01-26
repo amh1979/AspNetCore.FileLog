@@ -12,26 +12,30 @@ using System.Text;
 
 namespace AspNetCore.FileLog
 {
-    [System.Diagnostics.DebuggerDisplay("{Category}")]
+    [System.Diagnostics.DebuggerDisplay("{Rule.CategoryName}")]
     internal struct LoggerInformation
     {
+
         public ILogger Logger { get; set; }
-        public string Category { get; set; }
+
+        public LoggerFilterRule Rule { get; set; }
         public Type ProviderType { get; set; }
-        public LogLevel? MinLevel { get; set; }
-        public LogType LogType { get; set; }
+        //public string Category { get; set; }
+        //public LogLevel? MinLevel { get; set; }
+        //public LogType LogType { get; set; }
+        //public int TraceCount { get; set; }
         public Func<string, string, LogLevel, bool> Filter { get; set; }
         public bool ExternalScope { get; set; }
         public bool IsEnabled(LogLevel level)
         {
-            if (MinLevel != null && level < MinLevel)
+            if (Rule.LogLevel != null && level < Rule.LogLevel)
             {
                 return false;
             }
 
             if (Filter != null)
             {
-                return Filter(ProviderType.FullName, Category, level);
+                return Filter(ProviderType.FullName,Rule.CategoryName, level);
             }
 
             return true;

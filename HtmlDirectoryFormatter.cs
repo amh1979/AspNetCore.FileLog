@@ -27,7 +27,7 @@ namespace AspNetCore.FileLog
         { }
         public HtmlDirectoryFormatter(HtmlEncoder encoder)
         {
-            _htmlEncoder = encoder?? throw new ArgumentNullException("encoder");
+               _htmlEncoder = encoder?? throw new ArgumentNullException("encoder");
             CurrentCulture= System.Globalization.CultureInfo.CurrentCulture;
         }
 
@@ -54,7 +54,7 @@ namespace AspNetCore.FileLog
             stringBuilder.AppendFormat("<!DOCTYPE html>\r\n<html lang=\"{0}\">", CurrentCulture.TwoLetterISOLanguageName);
             stringBuilder.AppendFormat("\r\n<head>\r\n  <title>{0} {1}</title>", HtmlEncode("Index of"), HtmlEncode(pathString.Value));
             stringBuilder.Append("\r\n  <style>\r\n    body {\r\n        font-family: \"Segoe UI\", \"Segoe WP\", \"Helvetica Neue\", 'RobotoRegular', sans-serif;\r\n        font-size: 14px;}\r\n    header h1 {\r\n        font-family: \"Segoe UI Light\", \"Helvetica Neue\", 'RobotoLight', \"Segoe UI\", \"Segoe WP\", sans-serif;\r\n        font-size: 28px;\r\n        font-weight: 100;\r\n        margin-top: 5px;\r\n        margin-bottom: 0px;}\r\n    #index {\r\n        border-collapse: separate; \r\n        border-spacing: 0; \r\n        margin: 0 0 20px; }\r\n    #index th {\r\n        vertical-align: bottom;\r\n        padding: 10px 5px 5px 5px;\r\n        font-weight: 400;\r\n        color: #a0a0a0;\r\n        text-align: center; }\r\n    #index td { padding: 3px 10px; }\r\n    #index th, #index td {\r\n        border-right: 1px #ddd solid;\r\n        border-bottom: 1px #ddd solid;\r\n        border-left: 1px transparent solid;\r\n        border-top: 1px transparent solid;\r\n        box-sizing: border-box; }\r\n    #index th:last-child, #index td:last-child {\r\n        border-right: 1px transparent solid; }\r\n    #index td.length, td.modified { text-align:right; }\r\n    a { color:#1ba1e2;text-decoration:none; }\r\n    a:hover { color:#13709e;text-decoration:underline; }\r\n  </style>\r\n</head>\r\n<body>\r\n  <section id=\"main\">");
-            stringBuilder.AppendFormat("\r\n    <header><h1>{0} <a href=\"/\">/</a>", HtmlEncode("Index of"));
+            stringBuilder.AppendFormat("\r\n    <header><h1><a href=\"/\">Home</a>&nbsp;&nbsp;<a href='{0}'>Settings</a>&nbsp;&nbsp;", LoggerSettings.SettingsPath);
             string text = "/";
             string[] array = pathString.Value.Split(new char[1]
             {
@@ -63,7 +63,14 @@ namespace AspNetCore.FileLog
             foreach (string text2 in array)
             {
                 text = text + text2 + "/";
-                stringBuilder.AppendFormat("<a href=\"{0}\">{1}/</a>", HtmlEncode(text), HtmlEncode(text2));
+                if (text == pathString.Value)
+                {
+                    stringBuilder.AppendFormat("<a href='javascript:;'>{0}</a>", HtmlEncode(text2));
+                }
+                else
+                {
+                    stringBuilder.AppendFormat("<a href=\"{0}\">{1}/</a>", HtmlEncode(text), HtmlEncode(text2));
+                }
             }
             stringBuilder.AppendFormat(CurrentCulture, "</h1></header>\r\n    <table id=\"index\" summary=\"{0}\">\r\n    <thead>\r\n      <tr><th abbr=\"{1}\">{1}</th><th abbr=\"{2}\">{2}</th><th abbr=\"{3}\">{4}</th></tr>\r\n    </thead>\r\n    <tbody>",
                 HtmlEncode("The list of files in the given directory.  Column headers are listed in the first row."),
@@ -76,16 +83,29 @@ namespace AspNetCore.FileLog
                                        where info.IsDirectory
                                        select info)
             {
+                
                 StringBuilder stringBuilder2 = stringBuilder;
                 string arg = HtmlEncode(item.Name);
                 lastModified = item.LastModified;
-                stringBuilder2.AppendFormat("<tr class=\"directory\"><td class=\"name\"><a href=\"./{0}/\">{0}/</a></td>\r\n<td></td>\r\n<td class=\"modified\">{1}</td>\r\n</tr>",
-                    arg, HtmlEncode(lastModified.ToString(CurrentCulture)));
+                long? len=new System.IO.DirectoryInfo(item.PhysicalPath)
+                    .GetFiles()
+                    .Where(x=>x.Name != LoggerSettings.LogJsonFileName)
+                    .Sum(x => x.Length);
+                if (len <= 0)
+                {
+                    len = null;
+                }
+                stringBuilder2.AppendFormat("<tr class=\"directory\"><td class=\"name\"><a href=\"./{0}/\">{0}/</a></td><td>{1}</td><td class=\"modified\">{2}</td></tr>",
+                    arg, HtmlEncode(len?.ToString("n0", CurrentCulture)), HtmlEncode(lastModified.ToString(CurrentCulture)));
             }
             foreach (IFileInfo item2 in from info in contents
                                         where !info.IsDirectory
                                         select info)
             {
+                if (item2.Name == LoggerSettings.LogJsonFileName)
+                {
+                    continue;
+                }
                 StringBuilder stringBuilder3 = stringBuilder;
                 string arg2 = HtmlEncode(item2.Name);
                 string arg3 = HtmlEncode(item2.Length.ToString("n0", CurrentCulture));
@@ -103,6 +123,10 @@ namespace AspNetCore.FileLog
 
         private string HtmlEncode(string body)
         {
+            if (string.IsNullOrEmpty(body))
+            {
+                return string.Empty;
+            }
             return _htmlEncoder.Encode(body);
         }
     }

@@ -6,6 +6,9 @@
         body { font-family: 'Segoe UI', 'Segoe WP', 'Helvetica Neue', 'RobotoRegular', sans-serif; font-size: 14px; }
         header h1 { font-family: 'Segoe UI Light', 'Helvetica Neue', 'RobotoLight', 'Segoe UI', 'Segoe WP', sans-serif; font-size: 28px; font-weight: 100; margin-top: 5px; margin-bottom: 0px; }
             header h1 a { padding: 10px; }
+        button { display: inline-block; padding: 6px 12px; margin-bottom: 0; font-size: 14px; font-weight: 400; line-height: 1.42857143; text-align: center; white-space: nowrap; vertical-align: middle; -ms-touch-action: manipulation; touch-action: manipulation; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; background-image: none; border: 1px solid transparent; border-radius: 4px; color: #333; background-color: #fff; border-color: #ccc; }
+            button:hover { color: #333; background-color: #e6e6e6; border-color: #adadad; }
+        select, input { border-radius: 4px; padding: 5px; }
         #index { border-collapse: separate; border-spacing: 0; margin: 0 0 20px; }
             #index th { vertical-align: bottom; padding: 10px 5px 5px 5px; font-weight: 400; color: #a0a0a0; text-align: center; }
             #index td { padding: 3px 10px; }
@@ -14,21 +17,17 @@
                 #index td.length, td.modified { text-align: right; }
         a { color: #1ba1e2; text-decoration: none; }
             a:hover { color: #13709e; text-decoration: underline; }
+        input[name="_count"] { width: 30px; text-align: center; }
   </style>
     <script>
-        function setDefaultLevel(ele) {
-            var selects =  document.getElementsByName('_level');
+        function _setDefault(ele, name) {
+            var selects = document.getElementsByName(name);
             for (var i = 0; i < selects.length; i++) {
                 var s = selects[i];
                 s.value = ele.value;
-            }
-        }
-        function setDefaultType(ele)
-        {
-            var selects =  document.getElementsByName('_type');
-            for (var i = 0; i < selects.length; i++) {
-                var s = selects[i];
-                s.value = ele.value;
+                if (s.onchange) {
+                    s.onchange();
+                }
             }
         }
         function _save() {
@@ -42,19 +41,10 @@
             if (xmlHttp != null) {
                 xmlHttp.onreadystatechange = function () {
                     if (xmlHttp.readyState == 4 && xmlHttp.status == 200) { setTimeout(function () { location.reload(); }, 300); }
-                }
-                var tbody=document.getElementsByTagName('tbody')[0];                
-                var trs=tbody.getElementsByTagName("tr");                
-                var Rules = [];
-                for (var i = 0; i < trs.length; i++) {
-                    var tds = trs[i].getElementsByTagName("td");
-                    var sels = trs[i].getElementsByTagName('select');
-                    Rules.push({ CategoryName: tds[0].innerText, LogLevel: sels[0].value, LogType: sels[1].value});
-                }               
+                }                              
                 xmlHttp.open('POST', '{{url}}');
                 xmlHttp.setRequestHeader('Content-Type', 'application/json');
-                //console.log(JSON.stringify({ Rules: Rules }));
-                xmlHttp.send(JSON.stringify({ Rules: Rules }));
+                xmlHttp.send(JSON.stringify({ Rules: rules }));
             }
             else {
                 alert('Your browser does not support XMLHTTP.');
@@ -64,5 +54,74 @@
 </head>
 <body>
     {{body}}
+    <hr />
+    <table id='index' style="width:100%;">
+        <thead><tr><th abbr='Name'>Name</th><th abbr='Level'>Level</th><th>Scope</th><th>Type</th><th abbr='Operation'>Operation</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <script type="text/javascript">
+        if (window.HTMLElement) {
+            if (!document.body.outerHTML) {
+                HTMLElement.prototype.__defineGetter__("outerHTML", function () {
+
+                    var attr;
+                    var attrs = this.attributes;
+                    var str = "<" + this.tagName.toLowerCase();
+                    for (var i = 0; i < attrs.length; i++) {
+                        attr = attrs[i];
+                        if (attr.specified)
+                            str += " " + attr.name + '="' + attr.value + '"';
+                    }
+                    return str + ">" + this.innerHTML + "</" + this.tagName.toLowerCase() + ">";
+                });
+            }
+        }
+        var defaultLevel = document.getElementById("defaultLevel").outerHTML;
+        var defaultScope = document.getElementById("defaultScope").outerHTML;
+        var defaultType = document.getElementById("defaultType").outerHTML;
+        var tbody = document.getElementById("index")
+            .getElementsByTagName("tbody")[0];
+        for (var i = 0; i < rules.length; i++) {
+            var rule = rules[i];
+            rule.CategoryName = rule.Name;
+            var html = "<tr><td>" + rule.Name + "</td><td>" + rule.LogLevel + "</td><td>" + rule.LogScope + "</td><td>" + rule.LogType + "</td>";
+            html += "<td>" + defaultLevel.replace("id=\"defaultLevel\"", "name='_level'")
+                + "&nbsp;&nbsp;" + defaultScope.replace("id=\"defaultScope\"", "name='_scope'")
+                + "&nbsp;&nbsp;" + defaultType.replace("id=\"defaultType\"", "name='_type'")
+                + "&nbsp;&nbsp;<input type='text' value='" + rule.TraceCount + "' name='_count'/></td>";
+            html += "</tr>";
+            delete rule.Name;
+            tbody.insertAdjacentHTML("beforeend", html);
+            var selects = tbody.lastElementChild.querySelectorAll("select");
+            selects[0].value = rule.LogLevel;
+            selects[0]._rule = rule;
+            selects[0].onchange = function () {
+                this._rule.LogLevel = this.value;
+            }
+
+            selects[1].value = rule.LogScope;
+            selects[1]._rule = rule;
+            selects[1].onchange = function () {
+                this._rule.LogScope = this.value;
+            }
+
+            selects[2].value = rule.LogType;
+            selects[2]._rule = rule;
+            selects[2].onchange = function () {
+                this._rule.LogType = this.value;
+            }
+
+            var input = tbody.lastElementChild.querySelector("input");
+            input.value = rule.TraceCount;
+            input._rule = rule;
+            input.onchange = function () {
+                var value = parseInt(this.value);
+                if (!value) {
+                    this.value = "0";
+                }
+                this._rule.TraceCount = value || 0;
+            }
+        }
+    </script>
 </body>
 </html>

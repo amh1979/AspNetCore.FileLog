@@ -43,6 +43,7 @@ namespace AspNetCore.FileLog
             {
                 case AfterActionResult:
                     var actionContext = (ActionContext)value?.Value("actionContext");
+                    var path = actionContext?.HttpContext.Request.Path;
                     var result = value?.Value("result");
                     if (actionContext != null && result != null)
                     {
@@ -52,6 +53,7 @@ namespace AspNetCore.FileLog
                             obj = new
                             {
                                 ActionType = result.GetType().Name,
+                                Path=path,
                                 contentResult.Content,
                                 contentResult.ContentType,
                                 contentResult.StatusCode
@@ -62,6 +64,7 @@ namespace AspNetCore.FileLog
                             obj = new
                             {
                                 ActionType = result.GetType().Name,
+                                Path = path,
                                 objectResult.Value
                             };
                         }
@@ -70,7 +73,8 @@ namespace AspNetCore.FileLog
                             obj = new
                             {
                                 ActionType = result.GetType().Name,
-                                pageResult.Page.Path,
+                                Path = path,
+                                PagePath=pageResult.Page.Path,
                                 pageResult.Page.Layout
                             };
                         }
@@ -79,6 +83,7 @@ namespace AspNetCore.FileLog
                             obj = new
                             {
                                 ActionType = result.GetType().Name,
+                                Path = path,
                                 viewResult.ViewName,
                                 viewResult.Model
                             };
@@ -88,6 +93,7 @@ namespace AspNetCore.FileLog
                             obj = new
                             {
                                 ActionType = result.GetType().Name,
+                                Path = path,
                                 jsonResult.Value
                             };
                         }
@@ -95,12 +101,13 @@ namespace AspNetCore.FileLog
                         {
                             obj = new
                             {
-                                ActionType = result.GetType().Name
+                                ActionType = result.GetType().Name,
+                                Path = path,
                             };
                         }
                         if (obj != null)
                         {
-                            Logger.Debug<ActionResult>(Newtonsoft.Json.JsonConvert.SerializeObject(obj));
+                            Logger.Debug<ActionResult>(obj.ToJson());
                         }
                     }
                     break;

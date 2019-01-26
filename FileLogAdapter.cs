@@ -9,8 +9,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -19,15 +22,21 @@ namespace AspNetCore.FileLog
     /// <summary>
     /// 
     /// </summary>
-    internal class FileLogAdapter : ILogAdapter
+    public class FileLogAdapter : ILogAdapter
     {
-        static readonly Type[] IgnoreTypes = new Type[] {
-            typeof(Logger),
-            typeof(Microsoft.Extensions.Logging.LoggerExtensions),
-            typeof(Microsoft.Extensions.Logging.Logger<>),
-            typeof( Microsoft.Extensions.Logging.LoggerMessage),
-            typeof(FileLogAdapter),
-        };
+        static readonly Regex HtmlReg = new Regex("([\\n\\r\\t]|[\\s]{2})");
+        internal const string MarkdownHead = "|时间|消息|请求|错误|跟踪|\r\n|--|--|--|--|--|\r\n";
+        HtmlEncoder htmlEncoder;
+        /// <summary>
+        /// 
+        /// </summary>
+        public FileLogAdapter()
+        {
+            FileDirectory = LoggerSettings.LogDirectory;
+            htmlEncoder = HtmlEncoder.Default;
+        }
+        
+        const string NullMessage = "[null]";
         static readonly Regex NewLineRegex = new Regex("([\\n\\r]+)");
         static readonly string[] MessageTitle = new string[]
         {
@@ -46,91 +55,68 @@ namespace AspNetCore.FileLog
         /// <summary>
         /// 
         /// </summary>
-        public string FileDirectory { get; set; }
+        public string FileDirectory { get; }
 
-        public void Log(string category, string eventName, LogLevel logLevel, LogType logType,
-            string message, Exception exception, HttpContext context)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="category"></param>
+        /// <param name="eventName"></param>
+        /// <param name="logLevel"></param>
+        /// <param name="stackFrames"></param>
+        /// <param name="message"></param>
+        /// <param name="exception"></param>
+        /// <param name="context"></param>
+        /// <param name="format"></param>
+        public virtual void Log(string category, string eventName,
+            LogLevel logLevel, Format format,
+            string message, StackFrame[] stackFrames, Exception exception, HttpContext context)
         {
-            string path = string.Empty;
-            if (!string.IsNullOrEmpty(eventName))
+            switch (format)
             {
-                var index = eventName.LastIndexOf('.');
-                string name = eventName;
-                if (index > 0)
-                {
-                    name = eventName.Remove(0, eventName.LastIndexOf('.') + 1);
-                }
-                path = Path.Combine(FileDirectory, (exception != null ? LogLevel.Error : logLevel).ToString(),
-                    category, name, $"{DateTime.Now.ToString("yyyyMMdd")}.txt");
+                case Format.Txt:
+                    LogTxt(category, eventName, logLevel,  message, stackFrames, exception, context);
+                    break;
+                case Format.Markdown:
+                    LogMarkdown(category, eventName, logLevel,  message, stackFrames, exception, context);
+                    break;
             }
-            else
-            {
-                path = Path.Combine(FileDirectory, (exception != null ? LogLevel.Error : logLevel).ToString(),
-                  category, $"{DateTime.Now.ToString("yyyyMMdd")}.txt");
-            }
-
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"#################### {DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss.fffffff")} ###############");
-            sb.AppendLine($"{MessageTitle[0]}{NewLineRegex.Replace(message.TrimStart('\n', '\r'), "$1\t    ")}");
-
-            if (logType.HasFlag(LogType.HttpContext))
-            {
-                //HttpContext context = _httpContextAccessor?.HttpContext;
-
-                if (context != null)
-                {
-                    if (context.Request.Host.HasValue)
-                    {
-                        sb.AppendLine($"{MessageTitle[1]}{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}{context.Request.QueryString}");
-                    }
-                    sb.AppendLine($"{MessageTitle[2]}{context.Request.Method}");
-                    sb.AppendLine($"{MessageTitle[3]}{context.Connection.RemoteIpAddress}");
-                    if (context.Request.Headers["User-Agent"].Count > 0)
-                    {
-                        sb.AppendLine($"{MessageTitle[4]}{context.Request.Headers["User-Agent"]}");
-                    }
-                    if (context.User.Identity.IsAuthenticated)
-                    {
-                        sb.AppendLine($"{MessageTitle[5]}{context.User.Identity.Name}");
-                    }
-                    if (!context.IsFile() && (context.Request.ContentLength > 0 || context.Request.HasFormContentType))
-                    {
-
-                        if (context.Request.Query.Count > 0)
-                        {
-                            sb.AppendLine($"{MessageTitle[6]}{string.Join(",", context.Request.Query.Select(kv => $"{kv.Key}={kv.Value}"))}");
-                        }
-                        if (context.Request.HasFormContentType)
-                        {
-                            var forms = context.Request.ReadFormAsync().GetAwaiter().GetResult();
-                            if (forms.Count > 0)
-                            {
-                                sb.AppendLine($"{MessageTitle[7]}{string.Join(",", forms.Select(kv => $"{kv.Key}={kv.Value}"))}");
-                            }
-                        }
-                        else
-                        {
-                            var body = context.ReadBody();
-                            if (!string.IsNullOrEmpty(body))
-                            {
-                                sb.AppendLine($"{MessageTitle[8]}{body.TrimStart('\n', '\r', ' ')}");
-                            }
-                        }
-                    }
-                }
-            }
-            if (exception != null)
-            {
-                sb.AppendLine($"{MessageTitle[9]}{exception.GetString()}");
-            }
-            else if (logType.HasFlag(LogType.TraceStack))
-            {
-                var strack = new StackTrace(exception != null);
-                sb.AppendLine($"{MessageTitle[10]}{strack.GetString((x, y) => IgnoreTypes.Contains(y.DeclaringType))}");
-            }
-            new LoggerContent(path, sb.ToString());
-            sb.Clear();
-            sb = null;
         }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="category"></param>
+        /// <param name="eventName"></param>
+        /// <param name="logLevel"></param>
+        /// <param name="stackFrames"></param>
+        /// <param name="message"></param>
+        /// <param name="exception"></param>
+        /// <param name="context"></param>
+        protected virtual void LogTxt(string category, string eventName,
+            LogLevel logLevel, string message,
+            StackFrame[] stackFrames, Exception exception, HttpContext context)
+        {
+            
+            //await Task.Yield();
+            
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="category"></param>
+        /// <param name="eventName"></param>
+        /// <param name="logLevel"></param>
+        /// <param name="stackFrames"></param>
+        /// <param name="message"></param>
+        /// <param name="exception"></param>
+        /// <param name="context"></param>
+        protected virtual void LogMarkdown(string category, string eventName,
+            LogLevel logLevel, string message,
+            StackFrame[] stackFrames, Exception exception, HttpContext context)
+        {
+            //await Task.Yield();
+            
+        }
+
     }
 }

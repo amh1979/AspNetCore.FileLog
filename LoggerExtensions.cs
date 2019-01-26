@@ -8,6 +8,7 @@ using AspNetCore.FileLog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Internal;
+using StaticFiles=Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -24,6 +25,13 @@ using System.Reflection;
 using System.Text;
 using LOG = AspNetCore.FileLog;
 using Logging=Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http;
+using Microsoft.AspNetCore.Http.Features;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Hosting.Builder;
+
+
 namespace Microsoft.Extensions.DependencyInjection
 {
     /// <summary>
@@ -31,32 +39,34 @@ namespace Microsoft.Extensions.DependencyInjection
     /// </summary>
     public static class LoggerExtensions
     {
+
         internal static readonly List<string> ContentTypes = new List<string> {
             "text/plain",
             "text/css",
             "text/javascript",
             "text/json",
             "text/html"
-        };
-
+        };        
         /// <summary>
         /// 
         /// </summary>
         /// <param name="services"></param>
-        /// <param name="logDirectory">log file path
+        /// <param name="logAction">logAction</param>
         /// <para>e.g. .Logs or wwwroor/logs or C:/wwwroot/logs</para>
-        /// </param>
-        public static void AddFileLog(this IServiceCollection services, string logDirectory = ".Logs")
+        public static IServiceCollection AddFileLog(this IServiceCollection services, Action<LogOptions> logAction = null)
         {
             if (!services.Any(x => x.ImplementationType == typeof(LOG.LoggerFactory)))
             {
+                LogOptions logOptions = new LogOptions();
+                logAction?.Invoke(logOptions);                
+                services.Replace(ServiceDescriptor.Transient<IApplicationBuilderFactory, DefaultApplicationBuilderFactory>());
+                //LoggerSettings.Format = logOptions.Format;
                 LOG.LoggerFactory.ServiceCollection = services;
-                if (string.IsNullOrEmpty(logDirectory))
+                if (string.IsNullOrEmpty(logOptions.LogDirectory))
                 {
-                    logDirectory = ".Logs";
+                    logOptions.LogDirectory = ".Logs";
                 }
                 services.AddHttpContextAccessor();
-                services.AddSingleton<ILogAdapter, FileLogAdapter>();
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
                 Console.OutputEncoding = System.Text.Encoding.UTF8;
                 var _config = services.FirstOrDefault(x => x.ServiceType == typeof(IConfiguration))?.ImplementationInstance as IConfiguration;
@@ -96,19 +106,23 @@ namespace Microsoft.Extensions.DependencyInjection
                             environment.ContentRootPath = contentPath;
                             environment.WebRootPath = System.IO.Path.Combine(contentPath, "wwwroot");
                         }
+                        else {
+                            environment.WebRootPath = _contentPath;
+                        }
                     }
                     else
                     {
                         environment.WebRootPath = System.IO.Path.Combine(_config["ContentRoot"], "wwwroot");
                     }
                 }
-                if (Path.IsPathRooted(logDirectory))
+
+                if (Path.IsPathRooted(logOptions.LogDirectory))
                 {
-                   LoggerSettings. LogDirectory = logDirectory;
+                    LoggerSettings.LogDirectory = logOptions.LogDirectory;
                 }
                 else
                 {
-                    LoggerSettings.LogDirectory = Path.Combine(_config["ContentRoot"], logDirectory);
+                    LoggerSettings.LogDirectory = Path.Combine(_config["ContentRoot"], logOptions.LogDirectory);
                 }
                 if (!Directory.Exists(LoggerSettings.LogDirectory))
                 {
@@ -119,6 +133,10 @@ namespace Microsoft.Extensions.DependencyInjection
                 {
                     File.AppendAllText(path, LoggerSettings.LoggingJsonContent);
                 }
+                if (logOptions.LogAdapters.Count==0)
+                {
+                    logOptions.UseText();
+                }
                 ConfigurationBuilder configurationBuilder = new ConfigurationBuilder();
                 configurationBuilder
                     .SetBasePath(environment.ContentRootPath)
@@ -126,8 +144,6 @@ namespace Microsoft.Extensions.DependencyInjection
                 var configuration = configurationBuilder.Build();
                 services.RemoveAll<ILoggerProviderConfigurationFactory>();
                 services.RemoveAll(typeof(ILoggerProviderConfiguration<>));
-
-
                 var type = typeof(ILoggerProviderConfigurationFactory).Assembly.DefinedTypes
                     .SingleOrDefault(t => t.Name == "LoggingConfiguration");
                 services.RemoveAll(type);
@@ -142,52 +158,74 @@ namespace Microsoft.Extensions.DependencyInjection
                     x.Services.RemoveAll<IConfigureOptions<Logging.LoggerFilterOptions>>();
                     x.Services.AddSingleton<IConfigureOptions<Logging.LoggerFilterOptions>>(new LOG.LoggerFilterConfigureOptions(configuration));
                 });
+                services.TryAddEnumerable(logOptions.LogAdapters);
+                logOptions.LogAdapters.Clear();
                 services.Replace(ServiceDescriptor.Singleton<ILoggerFactory, LOG.LoggerFactory>());
                 services.Replace(ServiceDescriptor.Singleton<DiagnosticSource>(new DefaultDiagnosticListener()));
+                if (services.IsHttpRequest())
+                {
+                    MarkdownFileMiddleware.SaveResourceFiles(environment.WebRootPath);
+                }
+                DefaultApplicationBuilderFactory.OnCreateBuilder(UseFileLog,logOptions);
+                
             }
+            return services;
+            
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="app"></param>
-        /// <param name="browsePath"></param>
-        /// <param name="settingsPath"></param>
-        public static void UseFileLog(this IApplicationBuilder app,string browsePath= "/_Logs_",string settingsPath = "/_Settings_")
+        static void UseFileLog(IApplicationBuilder app, object state)
         {
+            var logOptions = state as LogOptions;
             LOG.LoggerFactory.ServiceProvider = app.ApplicationServices;
             if (app.ApplicationServices.GetService<ILoggerFactory>().GetType() != typeof(LOG.LoggerFactory))
             {
                 throw new NotImplementedException($"Please use IServiceCollection.AddFileLog first.");
             }
-            LoggerSettings.LogRequestPath = browsePath;
-            LoggerSettings.SettingsPath = settingsPath;
+            LoggerSettings.LogRequestPath = logOptions.LogRequestPath;
+            LoggerSettings.SettingsPath = logOptions.SettingsPath;
             if (string.IsNullOrEmpty(LoggerSettings.LogRequestPath))
             {
-                LoggerSettings.LogRequestPath = "/_Logs_";
+                LoggerSettings.LogRequestPath = "/_Logs_/";
             }
             if (string.IsNullOrEmpty(LoggerSettings.SettingsPath))
             {
                 LoggerSettings.SettingsPath = "/_Settings_";
             }
+            
             var fileOption = new FileServerOptions
             {
                 EnableDirectoryBrowsing = true,
                 RequestPath = LoggerSettings.LogRequestPath,
                 FileProvider = new PhysicalFileProvider(LoggerSettings.LogDirectory),
             };
-            fileOption.StaticFileOptions.OnPrepareResponse =
-                (context) =>
-                {
-                    if (ContentTypes.Contains(context.Context.Response.ContentType))
-                    {
-                        context.Context.Response.ContentType += "; charset=utf-8";
-                    }
-                };
+
+            fileOption.StaticFileOptions.OnPrepareResponse = PrepareResponse;
             fileOption.DirectoryBrowserOptions.Formatter = new HtmlDirectoryFormatter();
             app.UseFileServer(fileOption);
-            app.UseWhen(context => context.Request.Path.StartsWithSegments(LoggerSettings.SettingsPath),
-                    builder => builder.UseMiddleware<LoggerSettings>());
+            app.UseWhen(context =>
+            {
+                return context.Request.Path.StartsWithSegments(LoggerSettings.SettingsPath);
+            }, builder => builder.UseMiddleware<LoggerSettings>());
+            app.UseWhen(context =>
+            {
+                return Regex.IsMatch(context.Request.Path, LoggerSettings.LogRequestPath + ".+\\.md$");
+            }, builder => builder.UseMiddleware<MarkdownFileMiddleware>(LoggerSettings.LogDirectory));
+
+            //app.UseWhen(context =>
+            //{
+            //    return context.Request.Path.StartsWithSegments( LoggerSettings.LogRequestPath);
+            //}, builder => builder.UseFileServer(fileOption));
+        }
+        static bool IsHttpRequest(this IServiceCollection services)
+        {
+            return services.Any(x => x.ServiceType == typeof(Microsoft.AspNetCore.Hosting.Server.IServer));
+        }
+
+        static void PrepareResponse(StaticFiles.StaticFileResponseContext context)
+        {
+            if (ContentTypes.Contains(context.Context.Response.ContentType))
+            {
+                context.Context.Response.ContentType += "; charset=utf-8";
+            }
         }
     }
 }

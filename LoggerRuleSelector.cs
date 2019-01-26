@@ -14,12 +14,14 @@ namespace AspNetCore.FileLog
 {
     internal class LoggerRuleSelector
     {
-        public void Select(LoggerFilterOptions options, Type providerType, string category, out LogType logType,
-            out LogLevel? minLevel, out Func<string, string, LogLevel, bool> filter)
+        public void Select(LoggerFilterOptions options, Type providerType, string category,out LogType logType, out LogScope logScope,
+            out LogLevel? minLevel,out int traceCount, out Func<string, string, LogLevel, bool> filter)
         {
             filter = null;
             minLevel = options.MinLevel;
-            logType = options.MiniType;
+            logScope = options.MiniScope;
+            traceCount = options.TraceCount;
+            logType = options.LogType;
             // Filter rule selection:
             // 1. Select rules for current logger type, if there is none, select ones without logger type specified
             // 2. Select rules with longest matching categories
@@ -43,6 +45,8 @@ namespace AspNetCore.FileLog
             {
                 filter = current.Filter;
                 minLevel = current.LogLevel;
+                logScope = current.LogScope;
+                traceCount = current.TraceCount;
                 logType = current.LogType;
             }
 

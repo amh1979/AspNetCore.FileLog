@@ -7,17 +7,29 @@
     <Title>FileLog for AspNetCore</Title>
     <Description>
       Log information to file
+      support type: markdown,txt,database,system events
     </Description>
     <PackageReleaseNotes>
       Log information to file
+      support type: markdown,txt,database,system events
     </PackageReleaseNotes>
     <PackageTags>Logging,AspNetCore,FileLog,File,Log</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="markdown\markdown.html" />
     <None Remove="settingsPage.html" />
+    <None Remove="markdown\cerulean.min.css" />
+    <None Remove="markdown\font.woff2" />
+    <None Remove="markdown\strapdown.min.css" />
+    <None Remove="markdown\strapdown.min.js" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="markdown\markdown.html" />
     <EmbeddedResource Include="settingsPage.html" />
+    <EmbeddedResource Include="markdown\cerulean.min.css" />
+    <EmbeddedResource Include="markdown\font.woff2" />
+    <EmbeddedResource Include="markdown\strapdown.min.css" />
+    <EmbeddedResource Include="markdown\strapdown.min.js" />
   </ItemGroup>
 
   <ItemGroup>

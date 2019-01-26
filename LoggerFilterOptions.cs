@@ -17,17 +17,22 @@ namespace AspNetCore.FileLog
         public LoggerFilterOptions(Microsoft.Extensions.Logging.LoggerFilterOptions options)
         {
             this.MinLevel = LogLevel.Information;
-            this.MiniType = LogType.None;
+            this.MiniScope = LogScope.None;
+            this.LogType = LogType.Text;
             foreach (LoggerFilterRule rule in options.Rules)
             {
                 if (rule.CategoryName.Equals(LoggerSettings.DefaultName))
                 {
-                    this.MiniType = rule.LogType;
+                    this.MiniScope = rule.LogScope;
                     this.MinLevel = rule.LogLevel ?? LogLevel.Information;
+                    this.TraceCount = rule.TraceCount;
+                    this.LogType = rule.LogType;
                 }
                 this.Rules.Add(rule);
             }
         }
-        public LogType MiniType { get; set; }
+        public LogType LogType { get; set; }
+        public LogScope MiniScope { get; set; }
+        public int TraceCount { get; set; }
     }
 }

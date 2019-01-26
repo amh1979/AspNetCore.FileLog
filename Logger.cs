@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using LOG = AspNetCore.FileLog;
 
@@ -25,19 +26,30 @@ namespace System
     /// </summary>
     public partial class Logger : ILogger
     {
+        static readonly Type[] IgnoreTypes = new Type[] {
+            typeof(Logger),
+            typeof(Microsoft.Extensions.Logging.LoggerExtensions),
+            typeof(Microsoft.Extensions.Logging.Logger<>),
+            typeof( Microsoft.Extensions.Logging.LoggerMessage),
+            typeof(LogAdapter),
+        };
         private readonly LOG.LoggerFactory _loggerFactory;
 
         private LoggerInformation[] _loggers;
-        ILogAdapter _logAdapter;
+        IEnumerable<LogAdapter> _logAdapters;
         private int _scopeCount;
         IHttpContextAccessor _httpContextAccessor;
-        internal Logger(LOG.LoggerFactory loggerFactory, IHttpContextAccessor httpContextAccessor, ILogAdapter logAdapter)
+        internal Logger(LOG.LoggerFactory loggerFactory, IHttpContextAccessor httpContextAccessor, IEnumerable<LogAdapter> logAdapters)
         {
             _loggerFactory = loggerFactory;
             _httpContextAccessor = httpContextAccessor;
-            _logAdapter = logAdapter;
+            _logAdapters = logAdapters;
+             
         }
-
+        /// <summary>
+        /// logger save format
+        /// </summary>
+        public LogType LogType { get; set; }
         internal LoggerInformation[] Loggers
         {
             get { return _loggers; }
@@ -87,8 +99,41 @@ namespace System
                     if (!loged)
                     {
                         loged = true;
-                        _logAdapter.Log(loggerInfo.Category, eventId.Name, logLevel, loggerInfo.LogType, 
-                            formatter(state, exception), exception, _httpContextAccessor?.HttpContext);
+                        StackFrame[] stackFrames;
+                        var rule = loggerInfo.Rule;
+                        if (exception == null && rule.LogScope.HasFlag(LogScope.Trace))
+                        {
+                            stackFrames = new StackTrace(false).GetFrames(rule.TraceCount, CanSkip);
+                        }
+                        else
+                        {
+                            stackFrames = Array.Empty<StackFrame>();
+                        }
+                        HttpContext context = null;
+                        if (rule.LogScope.HasFlag(LogScope.HttpContext))
+                        {
+                            context = _httpContextAccessor?.HttpContext;
+                        }
+                        var _format = rule.LogType == LogType.All ? this.LogType : rule.LogType;
+                        foreach (var adapter in _logAdapters)
+                        {
+                            if (adapter.IsEnabled(LogType.Markdown, _format))
+                            {
+                                adapter.Log(rule.CategoryName, eventId.Name,logLevel, rule.LogType, formatter(state, exception), stackFrames, exception, context);
+                            }
+                            if (adapter.IsEnabled(LogType.Database, _format))
+                            {
+                                adapter.Log(rule.CategoryName, eventId.Name, logLevel, rule.LogType, formatter(state, exception), stackFrames, exception, context);
+                            }
+                            if (adapter.IsEnabled(LogType.SystemEvent, _format))                               
+                            {
+                                adapter.Log(rule.CategoryName, eventId.Name, logLevel, rule.LogType, formatter(state, exception), stackFrames, exception, context);
+                            }
+                            if (adapter.IsEnabled(LogType.Text, _format))                                
+                            {
+                                adapter.Log(rule.CategoryName, eventId.Name, logLevel, rule.LogType, formatter(state, exception), stackFrames, exception, context);
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -108,7 +153,19 @@ namespace System
                     message: "An error occurred while writing to logger(s).", innerExceptions: exceptions);
             }
         }
-       
+        bool CanSkip(StackFrame frame, MethodBase method)
+        {
+            bool canSkip = IgnoreTypes.Contains(method.DeclaringType);
+            if (!canSkip)
+            {
+                var type = method.DeclaringType?.ReflectedType;
+                if (type != null)
+                {
+                    canSkip = IgnoreTypes.Contains(type);
+                }
+            }
+            return canSkip;
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -296,6 +353,6 @@ namespace System
                 }
             }
         }
-
+        
     }
 }

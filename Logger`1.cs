@@ -19,7 +19,8 @@ namespace System
     /// </summary>
     public partial class Logger
     {
-        
+        static readonly Regex CategoryNameRegex = new Regex("^([a-zA-Z\\d\\.]+)$");
+
         private static void WriteLog(string categoryName, EventId eventId, LogLevel level, string message, Exception exception)
         {
             //new StackTrace(true)
@@ -27,10 +28,14 @@ namespace System
             {
                 throw new ArgumentNullException(nameof(categoryName));
             }
+            if (!CategoryNameRegex.IsMatch(categoryName))
+            {
+                throw new InvalidDataException("The categoryName is invalid. Only [a-zA-Z\\d\\.]+ are allowed.");
+            }
             ILoggerFactory factory;
             if (LOG.LoggerFactory.ServiceProvider == null)
             {
-                var services = LOG.LoggerFactory.ServiceCollection?? new ServiceCollection();
+                var services = LOG.LoggerFactory.ServiceCollection ?? new ServiceCollection();
                 services.AddFileLog();
                 factory = services.BuildServiceProvider().GetService<ILoggerFactory>();
             }
@@ -62,12 +67,12 @@ namespace System
         /// <param name="message">message</param>
         /// <param name="exception"><see cref="Exception"/></param>
         /// <param name="eventId"><see cref="EventId"/></param>
-
+       
         public static void Trace(string categoryName, string message = null, Exception exception = null, EventId eventId = default(EventId))
         {
             WriteLog(categoryName, eventId, LogLevel.Trace, message, exception);
         }
-
+       
         /// <summary>
         /// Formats and writes a debug log message.
         /// <para>Level: 1</para>

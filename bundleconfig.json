@@ -1,0 +1,20 @@
+[
+  {
+    "outputFileName": "strapdown/strapdown.min.css",
+    "inputFiles": [
+      "strapdown/strapdown.css"
+    ]
+  },
+  {
+    "outputFileName": "strapdown/strapdown.min.js",
+    "inputFiles": [
+      "strapdown/strapdown.js"
+    ]
+  },
+  {
+    "outputFileName": "markdown/strapdown.min.js",
+    "inputFiles": [
+      "markdown/strapdown.js"
+    ]
+  }
+]

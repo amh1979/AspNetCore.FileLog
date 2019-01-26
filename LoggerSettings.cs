@@ -20,10 +20,11 @@ namespace AspNetCore.FileLog
 {
     internal class LoggerSettings
     {
+        public const int TraceCount = 5;
         internal static string LogRequestPath { get; set; }
         internal static string SettingsPath { get; set; }
         internal static string LogDirectory { get; set; }
-
+        internal static LogType Format { get; set; }
         const string ResourceName = "AspNetCore.FileLog.settingsPage.html";
         public const string LogJsonFileName = "_logging.json";
         public const string RulesKey = "Rules";
@@ -51,7 +52,7 @@ namespace AspNetCore.FileLog
             SavePath = $"{SettingsPath}/Save";
             SavePath = SavePath.Replace("//", "/");
         }
-        internal const string LoggingJsonContent = "{\"Rules\":[{\"CategoryName\":\"Default\",\"LogLevel\":\"Information\",\"LogType\":\"All\"}]}";
+        internal const string LoggingJsonContent = "{\"Rules\":[{\"CategoryName\":\"Default\",\"LogLevel\":\"Information\",\"LogType\":\"Text\",\"TraceCount\":5,\"LogScope\":\"All\"}]}";
         public async Task Invoke(HttpContext context)
         {
             LoggerFilterOptions _filterOption = LoggerFactory._filterOptions;
@@ -83,39 +84,61 @@ namespace AspNetCore.FileLog
                 }
                 File.WriteAllText(logFilePath, json);
                 context.Response.ContentType = "application/json";
+                context.Response.StatusCode = 200;
                 await context.Response.WriteAsync("{message:'ok',status:200}");
             }
             else
             {
                 StringBuilder sb = new StringBuilder();
                 var levels = Enum.GetNames(typeof(LogLevel));
-                var types = Enum.GetNames(typeof(LogType));
-
+                var types = Enum.GetNames(typeof(LogScope));
+                var formats = Enum.GetNames(typeof(LogType));
                 sb.AppendLine("<header><h1><a href=\"" + LogRequestPath +
-                    "\">Logs</a></h1><br>Set Default : <select id='defaltLevel' onchange='setDefaultLevel(this)'><option>--Log Level--</option>");
+                    "\">Logs</a></h1><br>Default Level: <select id='defaultLevel' onchange='_setDefault(this,\"_level\")'><option>--Log Level--</option>");
                 sb.Append(string.Join("", levels.Select(t => $"<option>{t}</option>")));
-                sb.Append("</select> &nbsp;&nbsp; Default Type: <select id='defaltType' onchange='setDefaultType(this)'><option>--Log Type--</option>");
+                sb.Append("</select> &nbsp;&nbsp; Default Scope: <select id='defaultScope' onchange='_setDefault(this,\"_scope\")'><option>--Log Scope--</option>");
                 sb.Append(string.Join("", types.Select(t => $"<option>{t}</option>")));
-                sb.Append("</select> &nbsp;<button type='buttone' onclick='_save()'>Save</button></header>");
-                sb.AppendLine("<table id='index'><thead><tr><th abbr='Name'>Name</th><th abbr='Level'>Level</th><th>Type</th><th abbr='Operation'>Operation</th></tr></thead>");
+                sb.Append("</select> &nbsp;&nbsp; Default Type: <select id='defaultType' onchange='_setDefault(this,\"_type\")'><option>--Log Type--</option>");
+                sb.Append(string.Join("", formats.Select(t => $"<option>{t}</option>")));
+                sb.Append("</select>");
+
+                sb.Append($" &nbsp;&nbsp; TraceCount: <input type=text id='traceCount' value='' onchange='_setDefault(this,\"_count\")'/>");
+                sb.Append(" &nbsp;<button type='button' onclick='_save()'>Save</button></header>");
+   
+                SortedDictionary<string, LoggerFilterRule> rules = new SortedDictionary<string, LoggerFilterRule>();
+                //sb.AppendLine("<table id='index'><thead><tr><th abbr='Name'>Name</th><th abbr='Level'>Level</th><th>Type</th><th abbr='Operation'>Operation</th></tr></thead>");
                 SortedDictionary<string, LogLevel> levelValues = new SortedDictionary<string, LogLevel>();
-                SortedDictionary<string, LogType> typeValues = new SortedDictionary<string, LogType>();
+                SortedDictionary<string, LogScope> typeValues = new SortedDictionary<string, LogScope>();
                 foreach (LoggerFilterRule rule in _filterOption.Rules)
                 {
-                    levelValues[rule.CategoryName ?? "Default"] = rule.LogLevel ?? _filterOption.MinLevel;
-                    typeValues[rule.CategoryName ?? "Default"] = rule.LogType;
+                    rules[rule.CategoryName ?? "Default"] = rule;
+                    //levelValues[rule.CategoryName ?? "Default"] = rule.LogLevel ?? _filterOption.MinLevel;
+                    //typeValues[rule.CategoryName ?? "Default"] = rule.LogType;
                 }
                 foreach (var log in LoggerFactory._loggers.OrderBy(t => t.Key))
                 {
                     if (log.Value.Loggers.Length > 0)
                     {
-                        levelValues[log.Key] = log.Value.Loggers[0].MinLevel ?? _filterOption.MinLevel;
-                        typeValues[log.Key] = log.Value.Loggers[0].LogType;
+                        rules[log.Key] = log.Value.Loggers[0].Rule;
+                        //levelValues[log.Key] = log.Value.Loggers[0].Rule.LogLevel ?? _filterOption.MinLevel;
+                        //typeValues[log.Key] = log.Value.Loggers[0].Rule.LogType;
                     }
                 }
-                sb.AppendLine("<tbody>");
+                sb.AppendLine();
+                var objs = rules.Select(k => k.Value)
+                    .Select(t => new
+                    {
+                        Name = t.CategoryName,
+                        LogScope=t.LogScope.ToString(),
+                        LogLevel=t.LogLevel.ToString(),
+                        LogType = t.LogType.ToString(),
+                        t.TraceCount,
+                    });
+                sb.AppendLine($"<script>var rules={objs.ToJson()};</script>");
+                /*sb.AppendLine("<tbody>");
                 foreach (var log in levelValues)
                 {
+                   
                     sb.Append($"<tr><td>{log.Key}</td><td>{log.Value}</td><td>{typeValues[log.Key]}</td><td>");
                     sb.Append("<select name='_level'>");
                     foreach (var n in levels)
@@ -144,10 +167,18 @@ namespace AspNetCore.FileLog
                         }
                     }
                     sb.Append("</select>");
-                    sb.Append("</td></tr>");
+                    var rule = _filterOption.Rules.FirstOrDefault(x => x.CategoryName.Equals(log.Key, StringComparison.OrdinalIgnoreCase));
+                    var traceCount = TraceCount;
+                    if (rule is LoggerFilterRule _rule)
+                    {
+                        traceCount = _rule.TraceCount;
+                    }
+                    sb.AppendFormat("&nbsp;<input value='{0}' name='traceCount'/></td></tr>",traceCount);
                     sb.AppendLine();
                 }
                 sb.AppendLine("<tbody></table>");
+                */
+                context.Response.StatusCode = 200;
                 await context.Response.WriteAsync(html.Replace("{{url}}", SavePath).Replace("{{body}}", sb.ToString()));
             }
         }

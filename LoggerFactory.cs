@@ -31,7 +31,7 @@ namespace AspNetCore.FileLog
         internal static LoggerFilterOptions _filterOptions;
         IHostingEnvironment _environment;
         IHttpContextAccessor _httpContextAccessor;
-        ILogAdapter _logAdapter;
+        IEnumerable<LogAdapter> _logAdapters;
         internal LoggerExternalScopeProvider ScopeProvider { get; private set; }
         static internal IServiceCollection ServiceCollection { get; set; }
         static internal IServiceProvider ServiceProvider { get; set; }
@@ -39,8 +39,8 @@ namespace AspNetCore.FileLog
             IEnumerable<ILoggerProvider> providers,
             IHttpContextAccessor httpContextAccessor,
             IServiceProvider serviceProvider,
-            ILogAdapter logAdapter,
-            IOptionsMonitor<MSLOG.LoggerFilterOptions> filterOption)
+            IOptionsMonitor<MSLOG.LoggerFilterOptions> filterOption,
+            IEnumerable<LogAdapter> logAdapters)
         {
             ServiceProvider = serviceProvider;
             _httpContextAccessor = httpContextAccessor;
@@ -61,8 +61,8 @@ namespace AspNetCore.FileLog
             //    $"Create ILoggerFactory{Environment.NewLine}");
             RefreshFilters(filterOption.CurrentValue, string.Empty);
             _changeTokenRegistration = filterOption.OnChange(RefreshFilters);
-            _logAdapter = logAdapter;
-            _logAdapter.FileDirectory = LoggerSettings.LogDirectory;
+            _logAdapters = logAdapters;
+            //_logAdapter.FileDirectory = ;
         }
 
    
@@ -82,6 +82,12 @@ namespace AspNetCore.FileLog
             }
         }
 
+        public ILogger CreateLogger<T>()
+            where T:class
+        {
+            return this.CreateLogger(typeof(T).FullName);
+        }
+
         public ILogger CreateLogger(string categoryName)
         {
             if (CheckDisposed())
@@ -92,7 +98,7 @@ namespace AspNetCore.FileLog
             {
                 if (!_loggers.TryGetValue(categoryName, out var logger))
                 {
-                    logger = new Logger(this, _httpContextAccessor, _logAdapter)
+                    logger = new Logger(this, _httpContextAccessor, _logAdapters)
                     {
                         Loggers = CreateLoggers(categoryName)
                     };
@@ -153,7 +159,7 @@ namespace AspNetCore.FileLog
             loggerInformation.Logger = provider.CreateLogger(categoryName);
             loggerInformation.ProviderType = provider.GetType();
             loggerInformation.ExternalScope = provider is ISupportExternalScope;
-            loggerInformation.LogType = LogType.None;
+            //loggerInformation.Rule = LoggerFilterRule.CreateDefault();
         }
 
         private LoggerInformation[] CreateLoggers(string categoryName)
@@ -177,13 +183,15 @@ namespace AspNetCore.FileLog
                     loggerInformation.ProviderType,
                     categoryName,
                     out var logType,
+                    out var logScope,
                     out var minLevel,
+                    out int traceCount,
                     out var filter);
-
-                loggerInformation.Category = categoryName;
-                loggerInformation.MinLevel = minLevel;
-                loggerInformation.LogType = logType;
+                loggerInformation.Rule = new LoggerFilterRule(LoggerSettings.DefaultProviderName, categoryName, minLevel,filter);
+                loggerInformation.Rule.LogScope = logScope;
+                loggerInformation.Rule.LogType = logType;
                 loggerInformation.Filter = filter;
+                loggerInformation.Rule.TraceCount = traceCount;
             }
         }
 

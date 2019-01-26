@@ -8,30 +8,43 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
-
+using System.Threading.Tasks;
 
 namespace AspNetCore.FileLog
 {
     /// <summary>
     /// 
     /// </summary>
-    public interface ILogAdapter
+    public abstract class LogAdapter
     {
         /// <summary>
         /// 
         /// </summary>
-        string FileDirectory { get; set; }
+        protected abstract LogType LogType { get; }
         /// <summary>
         /// 
         /// </summary>
         /// <param name="category"></param>
         /// <param name="eventName"></param>
         /// <param name="logLevel"></param>
-        /// <param name="logType"></param>
+        /// <param name="type"></param>
+        /// <param name="stackFrames"></param>
         /// <param name="message"></param>
         /// <param name="exception"></param>
         /// <param name="context"></param>
-        void Log(string category, string eventName, LogLevel logLevel, LogType logType, string message, Exception exception, HttpContext context);
+        public abstract void Log(string category, string eventName, LogLevel logLevel, LogType type,
+              string message, StackFrame[] stackFrames, Exception exception, HttpContext context);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="current"></param>
+        /// <param name="rule"></param>
+        /// <returns></returns>
+        public virtual bool IsEnabled(LogType current, LogType rule)
+        {
+            return this.LogType.HasFlag(current) && (rule == LogType.All || rule.HasFlag(current));
+        }
     }
 }
